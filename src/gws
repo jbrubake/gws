@@ -170,6 +170,7 @@ declare -a branches
 
 # Default values for command line options
 option_only_changes=false
+option_submodules=false
 
 #-------------------------------------------------------------------------------
 #  General functions
@@ -720,11 +721,18 @@ function cmd_init()
     # Check if already a workspace
     [[ -f ${PROJECTS_FILE} ]] && echo -e "${C_NOT_SYNC}Already a workspace.${C_OFF}" && return 1
 
-    local found remote
+    local found remote type
     declare -a found
 
+    # Set find -type based on request for submodules
+    if $option_submodules; then
+        type=d,f
+    else
+        type=d
+    fi
+
     # Prepare the list of all existing projects, sorted
-    found=( $(find ./* -type d,f -name "$GIT_FOLDER" | sed -e "s#/${GIT_FOLDER}\$#/#" | cut -c 3- | sort) )
+    found=( $(find ./* -type "$type" -name "$GIT_FOLDER" | sed -e "s#/${GIT_FOLDER}\$#/#" | cut -c 3- | sort) )
     found=( $(remove_prefixed found[@]) )
 
     # Create the list of repositories
@@ -1063,7 +1071,7 @@ function cmd_status()
 # Verify command
 function cmd_check()
 {
-    local found all repo dir
+    local found all repo dir type
 
     declare -a projects_all_indexes
     declare -a projects_ignored
@@ -1076,8 +1084,15 @@ function cmd_check()
     # Create the list of ignored projects only
     readarray -t projects_ignored < <(comm -23 <(for a in "${projects_all_indexes[@]}"; do echo "$a"; done | sort) <(for a in "${projects_indexes[@]}"; do echo "$a"; done | sort))
 
+    # Set find -type based on request for submodules
+    if $option_submodules; then
+        type=d,f
+    else
+        type=d
+    fi
+
     # Prepare list of all projects, existing or missing, sorted with no duplicates
-    found=( $(find ./* -type d,f -name "$GIT_FOLDER" | sed -e "s#/${GIT_FOLDER}\$##" | cut -c 3- | sort) )
+    found=( $(find ./* -type "$type" -name "$GIT_FOLDER" | sed -e "s#/${GIT_FOLDER}\$##" | cut -c 3- | sort) )
     all=( "${found[@]}" "${projects_all_indexes[@]}" )
     readarray -t all < <(for a in "${all[@]}"; do echo "$a"; done | sort -u)
 
@@ -1134,6 +1149,9 @@ If no ${C_REPO}<command>${C_OFF} is specified, the command ${C_REPO}status${C_OF
 
 The commands ${C_REPO}status${C_OFF}, ${C_REPO}fetch${C_OFF} and ${C_REPO}ff${C_OFF} accept the option
 --only-changes before the ${C_HELP_DIR}<directory>${C_OFF}. If given, only repositories with changes will be shown.
+
+The commands ${C_REPO}init${C_OFF} and ${C_REPO}check${C_OFF} accept the option
+--submodules before the ${C_HELP_DIR}<directory>${C_OFF}. If given, git submodules will be included.
 "
 }
 
@@ -1164,6 +1182,9 @@ while [[ "$1" =~ ^- ]]; do
     case "$1" in
         --only-changes)
             option_only_changes=true
+            ;;
+        --submodules)
+            option_submodules=true
             ;;
         *)
             echo -e "${C_ERROR}Unknown option: $1${C_OFF}"
